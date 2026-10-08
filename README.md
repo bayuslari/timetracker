@@ -9,6 +9,8 @@ A simple project time tracker built with **Next.js 16** (App Router), React 19, 
 - **Pause / Resume** — pause a session and resume it later; paused time is not counted.
 - **End** — finish the session and log it.
 - **Notes** — describe what you're working on while the timer runs.
+- **Add missed time** — forgot to start the timer? Log a past entry with project, date, start and end time.
+- **Edit entries** — fix the project, note or times of any entry (✎ in the log). For a running session you can move the start time back. Pauses inside the new time range are kept, and overlapping entries are flagged.
 - **Log** — sessions grouped by day with daily totals, per-project today/total time, and a "tracked today" counter.
 - **Export CSV** — download all sessions.
 
@@ -39,6 +41,7 @@ src/
   app/                  # Next.js App Router (layout, page, global styles)
   components/
     TimeTracker.tsx     # Timer, projects panel and session log
+    SessionEditor.tsx   # Dialog to add missed time or edit an entry
   lib/
     store.ts            # localStorage-backed store + actions (start/pause/resume/end)
     useNow.ts           # ticking clock hook

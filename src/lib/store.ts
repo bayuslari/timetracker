@@ -112,6 +112,35 @@ function closeSegments(segments: Segment[], now: number): Segment[] {
   return segments.map((s) => (s.end === null ? { ...s, end: now } : s));
 }
 
+/**
+ * Move a session's start (and end, for ended sessions) while keeping any
+ * pauses that still fall within the new range.
+ */
+export function retime(
+  segments: Segment[],
+  status: SessionStatus,
+  start: number,
+  end: number | null,
+): Segment[] {
+  const limit = end ?? Infinity;
+  const kept = segments
+    .filter((seg) => (seg.end ?? Infinity) > start && seg.start < limit)
+    .map((seg) => ({
+      start: Math.max(seg.start, start),
+      end: seg.end === null ? null : Math.min(seg.end, limit),
+    }));
+
+  if (kept.length === 0) {
+    // New range doesn't overlap any recorded segment: use one segment.
+    if (status === "running") return [{ start, end: null }];
+    if (status === "paused") return [{ start, end: start }];
+    return [{ start, end }];
+  }
+  kept[0].start = start;
+  if (end !== null) kept[kept.length - 1].end = end;
+  return kept;
+}
+
 export function getActiveSession(s: State): WorkSession | undefined {
   return s.sessions.find((x) => x.status !== "ended");
 }
@@ -223,6 +252,48 @@ export const actions = {
       sessions: state.sessions.map((s) =>
         s.id === sessionId ? { ...s, note } : s,
       ),
+    });
+  },
+
+  /** Log a finished session after the fact (for work you forgot to track). */
+  addSession(projectId: string, note: string, start: number, end: number) {
+    if (!(end > start)) return;
+    setState({
+      ...state,
+      sessions: [
+        ...state.sessions,
+        {
+          id: uid(),
+          projectId,
+          note: note.trim(),
+          status: "ended",
+          segments: [{ start, end }],
+        },
+      ],
+    });
+  },
+
+  /**
+   * Edit a session. `end` is ignored for active sessions (they have no end
+   * yet); pauses that still fall inside the new start/end are kept.
+   */
+  updateSession(
+    sessionId: string,
+    patch: { projectId: string; note: string; start: number; end: number | null },
+  ) {
+    setState({
+      ...state,
+      sessions: state.sessions.map((s) => {
+        if (s.id !== sessionId) return s;
+        const end = s.status === "ended" ? patch.end : null;
+        if (end !== null && !(end > patch.start)) return s;
+        return {
+          ...s,
+          projectId: patch.projectId,
+          note: patch.note.trim(),
+          segments: retime(s.segments, s.status, patch.start, end),
+        };
+      }),
     });
   },
 

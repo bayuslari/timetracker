@@ -13,6 +13,7 @@ import {
   type WorkSession,
 } from "@/lib/store";
 import { useNow } from "@/lib/useNow";
+import SessionEditor, { type EditorTarget } from "@/components/SessionEditor";
 import {
   dayKey,
   formatDay,
@@ -80,6 +81,7 @@ export default function TimeTracker() {
           todayStart={todayStart}
         />
         <SessionLog
+          projects={state.projects}
           sessions={state.sessions}
           projectsById={projectsById}
           now={now}
@@ -359,14 +361,20 @@ function ProjectRow({
 }
 
 function SessionLog({
+  projects,
   sessions,
   projectsById,
   now,
 }: {
+  projects: Project[];
   sessions: WorkSession[];
   projectsById: Map<string, Project>;
   now: number;
 }) {
+  const [editor, setEditor] = useState<{ key: number; target: EditorTarget } | null>(null);
+  const openEditor = (target: EditorTarget) =>
+    setEditor((prev) => ({ key: (prev?.key ?? 0) + 1, target }));
+
   const groups = useMemo(() => {
     const sorted = [...sessions].sort(
       (a, b) => sessionStart(b) - sessionStart(a),
@@ -416,12 +424,32 @@ function SessionLog({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-muted">
           Log
         </h2>
-        {sessions.length > 0 && (
-          <button className="btn btn-ghost text-xs" onClick={exportCsv}>
-            Export CSV
+        <div className="flex gap-1">
+          {sessions.length > 0 && (
+            <button className="btn btn-ghost text-xs" onClick={exportCsv}>
+              Export CSV
+            </button>
+          )}
+          <button
+            className="btn btn-ghost text-xs"
+            disabled={projects.length === 0}
+            title={projects.length === 0 ? "Add a project first" : undefined}
+            onClick={() => openEditor({ mode: "add" })}
+          >
+            + Add missed time
           </button>
-        )}
+        </div>
       </div>
+
+      {editor && (
+        <SessionEditor
+          key={editor.key}
+          target={editor.target}
+          projects={projects}
+          sessions={sessions}
+          onClose={() => setEditor(null)}
+        />
+      )}
 
       {groups.length === 0 ? (
         <p className="card text-sm text-muted">
@@ -480,6 +508,14 @@ function SessionLog({
                         </span>
                         <button
                           className="btn btn-ghost px-2 text-xs"
+                          aria-label="Edit entry"
+                          title="Edit entry"
+                          onClick={() => openEditor({ mode: "edit", session: s })}
+                        >
+                          ✎
+                        </button>
+                        <button
+                          className="btn btn-ghost -ml-2 px-2 text-xs"
                           aria-label="Delete entry"
                           title="Delete entry"
                           onClick={() => {
